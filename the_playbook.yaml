@@ -1,0 +1,93 @@
+---
+- name: Configure Apache2, PHP, MySQL, and UFW Firewall
+  hosts: webservers 
+  become: yes         
+
+  vars:
+   
+    ufw_default_incoming_policy: deny 
+    ufw_default_outgoing_policy: allow 
+    ufw_rules:
+      - port: "22"
+        proto: "tcp"
+        rule: "allow"
+      - port: "80"
+        proto: "tcp"
+        rule: "allow"
+      - port: "443"
+        proto: "tcp"
+        rule: "allow"
+
+    apache_remove_default_vhost: true
+    apache_global_vhost_settings: |
+      DirectoryIndex index.php index.html index.htm
+
+    php_enable_webserver: true
+    php_webserver_daemon: apache2
+    php_packages:
+      - php
+      - php-cli
+      - php-common
+      - libapache2-mod-php  
+      - php-mysql         
+
+    mysql_root_password: "01206694832awzSd" 
+    mysql_users: 
+      - name: "yasser11"
+        host: "localhost"
+        password: "01206694832awzSd"
+        priv: "*.*:ALL"
+    mysql_databases:
+      - name: "webdb"
+        encoding: "utf8"
+        collation: "utf8_general_ci"
+    mysql_secure_installation: true 
+
+  roles: 
+    - geerlingguy.apache 
+    - geerlingguy.php    
+    - geerlingguy.mysql  
+
+  tasks:
+    - name: Copy index.php to web root
+      ansible.builtin.copy:
+        src: files/index.php
+        dest: /var/www/html/index.php
+        owner: www-data
+        group: www-data
+        mode: '0644'
+      notify: Restart apache
+
+    - name: Copy db_test.php to web root
+      ansible.builtin.copy:
+        content: |
+          <?php
+          $servername = "localhost";
+          $username = "yasser11";
+          $password = "01206694832awzSd"; 
+          $dbname = "webdb";
+
+          // Create connection
+          $conn = new mysqli($servername, $username, $password, $dbname);
+
+          // Check connection
+          if ($conn->connect_error) {
+              die("Connection failed: " . $conn->connect_error);
+          }
+          echo "Connected to MySQL successfully!";
+
+          $conn->close();
+          ?>
+        dest: /var/www/html/db_test.php
+        owner: www-data
+        group: www-data
+        mode: '0644'
+      notify: Restart apache
+
+  handlers:
+    - name: Restart apache
+      ansible.builtin.service:
+        name: apache2
+        state: restarted
+      listen: "Restart apache"
+
